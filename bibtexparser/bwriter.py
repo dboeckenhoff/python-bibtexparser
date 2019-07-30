@@ -22,13 +22,16 @@ def to_bibtex(parsed):
     return BibTexWriter().write(parsed)
 
 
-def _str_or_expr_to_bibtex(e):
+def _str_or_expr_to_bibtex(e, protected=True):
     if isinstance(e, BibDataStringExpression):
         return ' # '.join([_str_or_expr_to_bibtex(s) for s in e.expr])
     elif isinstance(e, BibDataString):
         return e.name
     else:
-        return '{' + e + '}'
+        if protected:
+            return '{' + e + '}'
+        else:
+            return e
 
 
 class BibTexWriter(object):
@@ -77,6 +80,9 @@ class BibTexWriter(object):
         self._max_field_width = 0
         #: Whether common strings are written
         self.common_strings = write_common_strings
+        #: List of entries which should not be protected (put into breakets). A
+        #    candidate is e.g. 'month' -> see https://tex.stackexchange.com/questions/330179/month-field-not-an-integer-will-not-sort-properly
+        self.unprotected = []
 
     def write(self, bib_database):
         """
@@ -130,12 +136,13 @@ class BibTexWriter(object):
             field_fmt = u",\n{indent}{field:<{field_max_w}} = {value}"
         # Write field = value lines
         for field in [i for i in display_order if i not in ['ENTRYTYPE', 'ID']]:
+            protected = (not field in self.unprotected)
             try:
                 bibtex += field_fmt.format(
                     indent=self.indent,
                     field=field,
                     field_max_w=self._max_field_width,
-                    value=_str_or_expr_to_bibtex(entry[field]))
+                    value=_str_or_expr_to_bibtex(entry[field], protected))
             except TypeError:
                 raise TypeError(u"The field %s in entry %s must be a string"
                                 % (field, entry['ID']))
